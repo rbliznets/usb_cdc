@@ -1,0 +1,14 @@
+version: "1.1.0"
+description: the command console and tracing to spiffs 
+url: https://github.com/rbliznets/esp32-utils
+dependencies:
+  espressif/esp_tinyusb: ">=1.4.4"
+  task:
+    version: "*"
+    git: https://github.com/rbliznets/esp32-task.git
+  idf: ">=5.2"
+targets:
+  - esp32
+  - esp32s2
+  - esp32s3
+  - esp32c3
