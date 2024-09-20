@@ -20,6 +20,8 @@
 
 int8_t CUsbCDC::mWakeUpPin = -1;
 
+CUsbCDC *CUsbCDC::theSingleInstance = nullptr;
+
 void CUsbCDC::cdc_rx_callback(int itf, cdcacm_event_t *event)
 {
     CUsbCDC::Instance()->rx((tinyusb_cdcacm_itf_t)itf);

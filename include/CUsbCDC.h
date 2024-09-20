@@ -36,6 +36,9 @@ typedef void onCDCConect(int itf, bool con);
 /// Класс обертка для tinyUSB СDС.
 class CUsbCDC
 {
+private:
+	static CUsbCDC *theSingleInstance; ///< Указатель на единственный экземпляр
+
 protected:
 	/// функция обработки данных из CDC.
 	/*!
@@ -58,21 +61,37 @@ protected:
 
 	uint8_t mRxBuf0[USB_MAX_DATA]; ///< Буфер для приема данных.
 
-	
 	onCDCDataRx *onCmd = nullptr;	  ///< Обработка события приема.
 	onCDCConect *onConnect = nullptr; ///< Обработка события подключения
 
 public:
 	static int8_t mWakeUpPin; ///< Wakeup.
+
 	/// Единственный экземпляр класса.
 	/*!
 	  \return Указатель на CUsbCDC
 	*/
 	static CUsbCDC *Instance()
 	{
-		static CUsbCDC theSingleInstance;
-		return &theSingleInstance;
-	}
+		if (theSingleInstance == nullptr)
+			theSingleInstance = new CUsbCDC();
+		return theSingleInstance;
+	};
+	/// Освобождение ресурсов.
+	static void free()
+	{
+		if (theSingleInstance != nullptr)
+		{
+			delete theSingleInstance;
+			theSingleInstance = nullptr;
+		}
+	};
+
+	/// Подключение к USB.
+	/*
+	 * \return true - если работает, false - если нет.
+	 */
+	static inline bool isRun() { return (theSingleInstance != nullptr); };
 
 	/// Запуск драйвера.
 	/*!
