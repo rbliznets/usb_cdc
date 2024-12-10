@@ -13,6 +13,7 @@
 #include "sdkconfig.h"
 #ifdef CONFIG_TINYUSB_CDC_ENABLED
 
+#include "esp_pm.h"
 #include "tinyusb.h"
 #include "tusb_console.h"
 #include "tusb_cdc_acm.h"
@@ -40,6 +41,9 @@ private:
 	static CUsbCDC *theSingleInstance; ///< Указатель на единственный экземпляр
 
 protected:
+#if CONFIG_PM_ENABLE
+	esp_pm_lock_handle_t mPMLock; ///< флаг запрета на понижение частоты CPU
+#endif
 	/// функция обработки данных из CDC.
 	/*!
 	  \param[in] itf номер CDC.

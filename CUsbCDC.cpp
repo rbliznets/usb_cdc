@@ -61,6 +61,11 @@ void CUsbCDC::cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 
 void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 {
+#if CONFIG_PM_ENABLE
+    esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "usb", &mPMLock);
+    ESP_ERROR_CHECK(esp_pm_lock_acquire(mPMLock));
+#endif
+
     const tinyusb_config_t tusb_cfg = {
         .device_descriptor = nullptr,
         .string_descriptor = nullptr,
@@ -100,6 +105,10 @@ void CUsbCDC::stop()
 #endif
     ESP_ERROR_CHECK(tusb_cdc_acm_deinit(TINYUSB_CDC_ACM_0));
     ESP_ERROR_CHECK(tinyusb_driver_uninstall());
+#if CONFIG_PM_ENABLE
+    esp_pm_lock_release(mPMLock);
+    esp_pm_lock_delete(mPMLock);
+#endif
 }
 
 bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
