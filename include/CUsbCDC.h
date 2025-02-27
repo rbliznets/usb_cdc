@@ -18,18 +18,19 @@
 #include "tusb_console.h"
 #include "tusb_cdc_acm.h"
 
-#define USB_MAX_DATA (64)
+#define USB_MAX_DATA (64) // Максимальный размер данных для приема
 
 /// Функция события приема данных.
 /*!
- * \param[in] itf номер CDC.
- * \param[in] data данные.
+ * \param[in] itf номер CDC интерфейса.
+ * \param[in] data данные, полученные от устройства.
  * \param[in] size размер данных.
  */
 typedef void onCDCDataRx(int itf, uint8_t *data, size_t size);
+
 /// Функция события на установку соединения.
 /*!
-	\param[in] itf номер CDC.
+	\param[in] itf номер CDC интерфейса.
 	\param[in] con true - подключение, false - отключение.
 */
 typedef void onCDCConect(int itf, bool con);
@@ -38,38 +39,40 @@ typedef void onCDCConect(int itf, bool con);
 class CUsbCDC
 {
 private:
-	static CUsbCDC *theSingleInstance; ///< Указатель на единственный экземпляр
+	static CUsbCDC *theSingleInstance; ///< Указатель на единственный экземпляр класса
 
 protected:
 #if CONFIG_PM_ENABLE
-	esp_pm_lock_handle_t mPMLock; ///< флаг запрета на понижение частоты CPU
+	esp_pm_lock_handle_t mPMLock; ///< Флаг запрета на понижение частоты CPU
 #endif
-	/// функция обработки данных из CDC.
+
+	/// Функция обработки данных из CDC.
 	/*!
-	  \param[in] itf номер CDC.
+	  \param[in] itf номер CDC интерфейса.
 	  \param[in] event параметры callback функции.
 	*/
 	static void cdc_rx_callback(int itf, cdcacm_event_t *event);
-	/// функция обработки изменения состояния CDC.
+
+	/// Функция обработки изменения состояния CDC.
 	/*!
-	  \param[in] itf номер CDC.
+	  \param[in] itf номер CDC интерфейса.
 	  \param[in] event параметры callback функции.
 	*/
 	static void cdc_line_state_changed_callback(int itf, cdcacm_event_t *event);
 
-	/// функция обработки данных из CDC.
+	/// Функция обработки данных из CDC.
 	/*!
-	  \param[in] itf номер CDC.
+	  \param[in] itf номер CDC интерфейса.
 	*/
 	void rx(tinyusb_cdcacm_itf_t itf);
 
 	uint8_t mRxBuf0[USB_MAX_DATA]; ///< Буфер для приема данных.
 
-	onCDCDataRx *onCmd = nullptr;	  ///< Обработка события приема.
-	onCDCConect *onConnect = nullptr; ///< Обработка события подключения
+	onCDCDataRx *onCmd = nullptr;	  ///< Обработка события приема данных.
+	onCDCConect *onConnect = nullptr; ///< Обработка события подключения/отключения.
 
 public:
-	static int8_t mWakeUpPin; ///< Wakeup.
+	static int8_t mWakeUpPin; ///< Wakeup пин для управления唤醒 состоянием.
 
 	/// Единственный экземпляр класса.
 	/*!
@@ -81,6 +84,7 @@ public:
 			theSingleInstance = new CUsbCDC();
 		return theSingleInstance;
 	};
+
 	/// Освобождение ресурсов.
 	static void free()
 	{
@@ -103,14 +107,15 @@ public:
 	  \param[in] connect Обработчик подключения.
 	*/
 	void start(onCDCDataRx *func, onCDCConect *connect = nullptr);
+
 	/// Остановка драйвера.
 	void stop();
 
 	/// Отослать данные.
 	/*!
-	  \param[in] itf номер CDC.
-	  \param[in] data данные.
-	  \param[in] size размер.
+	  \param[in] itf номер CDC интерфейса.
+	  \param[in] data данные для отправки.
+	  \param[in] size размер данных.
 	  \return true при успехе
 	*/
 	bool send(int itf, uint8_t *data, size_t size);
