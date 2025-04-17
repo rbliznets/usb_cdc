@@ -71,6 +71,8 @@ protected:
 	onCDCDataRx *onCmd = nullptr;	  ///< Обработка события приема данных.
 	onCDCConect *onConnect = nullptr; ///< Обработка события подключения/отключения.
 
+	~CUsbCDC() { stop(); };
+
 public:
 	static int8_t mWakeUpPin; ///< Wakeup пин для управления唤醒 состоянием.
 
