@@ -76,7 +76,7 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 {
 #if CONFIG_PM_ENABLE
     // Фиксируем максимальную частоту CPU для стабильной работы USB
-    esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "usb", &mPMLock);
+    esp_pm_lock_create(ESP_PM_APB_FREQ_MAX, 0, "usb", &mPMLock);
     ESP_ERROR_CHECK(esp_pm_lock_acquire(mPMLock));
 #endif
 
@@ -143,12 +143,17 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
     // Дозапись оставшихся данных (если буфер заполнялся частями)
     while (sz != size)
     {
-        sz += tinyusb_cdcacm_write_queue(
-            (tinyusb_cdcacm_itf_t)itf, &data[sz], size - sz);
+        size_t s = tinyusb_cdcacm_write_queue((tinyusb_cdcacm_itf_t)itf, &data[sz], size - sz);
+        if (s != 0)
+            sz += s;
+        else
+            return false;
     }
 
     // Синхронная отправка данных с таймаутом 100 мс
-    ESP_ERROR_CHECK(tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 100));
+    if (tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 100) != ESP_OK)
+        return false;
+
     return true;
 }
 
