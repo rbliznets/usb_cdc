@@ -18,7 +18,7 @@
 #include "tusb_console.h"
 #include "tusb_cdc_acm.h"
 
-#define USB_MAX_DATA (64) // Максимальный размер данных для приема
+#define USB_MAX_DATA (128) // Максимальный размер данных для приема
 
 /// Функция события приема данных.
 /*!

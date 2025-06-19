@@ -96,7 +96,7 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
     tinyusb_config_cdcacm_t acm_cfg = {
         .usb_dev = TINYUSB_USBDEV_0,                                    // Использовать первый USB-контроллер
         .cdc_port = TINYUSB_CDC_ACM_0,                                  // Первый CDC порт
-        .rx_unread_buf_sz = USB_MAX_DATA,                               // Размер буфера приема
+        // .rx_unread_buf_sz = USB_MAX_DATA,                               // Размер буфера приема
         .callback_rx = &cdc_rx_callback,                                // Callback на прием данных
         .callback_line_state_changed = &cdc_line_state_changed_callback // Callback на изменение DTR
     };
