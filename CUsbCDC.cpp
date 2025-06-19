@@ -76,7 +76,7 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 {
 #if CONFIG_PM_ENABLE
     // Фиксируем максимальную частоту CPU для стабильной работы USB
-    esp_pm_lock_create(ESP_PM_APB_FREQ_MAX, 0, "usb", &mPMLock);
+    esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "usb", &mPMLock);
     ESP_ERROR_CHECK(esp_pm_lock_acquire(mPMLock));
 #endif
 
