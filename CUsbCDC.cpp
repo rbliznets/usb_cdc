@@ -18,7 +18,8 @@
 #include "CTrace.h"
 #include <cstring>
 #include "esp_sleep.h"
-
+#include "tinyusb_default_config.h"
+  
 // Статические члены класса
 int8_t CUsbCDC::mWakeUpPin = -1;               ///< Пин для пробуждения от сна
 CUsbCDC *CUsbCDC::theSingleInstance = nullptr; ///< Единственный экземпляр класса
@@ -81,24 +82,22 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 #endif
 
     // Базовая конфигурация USB-устройства
-    const tinyusb_config_t tusb_cfg = {
-        .device_descriptor = nullptr, // Использовать дефолтный дескриптор
-        .string_descriptor = nullptr, // Без строковых дескрипторов
-        .external_phy = false,        // Внутренний PHY
-        .configuration_descriptor = nullptr,
-        .self_powered = true,         // Питание от самодостаточного источника
-        .vbus_monitor_io = mWakeUpPin // Пин для мониторинга питания
-    };
+    tinyusb_config_t tusb_cfg = TINYUSB_DEFAULT_CONFIG();
+    if (mWakeUpPin > 0)
+    {
+        tusb_cfg.phy.self_powered = true;
+        tusb_cfg.phy.vbus_monitor_io = mWakeUpPin;
+    }
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
     // Конфигурация ACM (Abstract Control Model) интерфейса
     tinyusb_config_cdcacm_t acm_cfg = {
-        .usb_dev = TINYUSB_USBDEV_0,                                    // Использовать первый USB-контроллер
-        .cdc_port = TINYUSB_CDC_ACM_0,                                  // Первый CDC порт
-        // .rx_unread_buf_sz = USB_MAX_DATA,                               // Размер буфера приема
+        .cdc_port = TINYUSB_CDC_ACM_0, // Первый CDC порт
         .callback_rx = &cdc_rx_callback,                                // Callback на прием данных
-        .callback_line_state_changed = &cdc_line_state_changed_callback // Callback на изменение DTR
+        .callback_rx_wanted_char = nullptr,
+        .callback_line_state_changed = &cdc_line_state_changed_callback, // Callback на изменение DTR
+        .callback_line_coding_changed = nullptr
     };
 
     // Инициализация ACM интерфейсов
