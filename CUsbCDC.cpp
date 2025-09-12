@@ -19,7 +19,7 @@
 #include <cstring>
 #include "esp_sleep.h"
 #include "tinyusb_default_config.h"
-  
+
 // Статические члены класса
 int8_t CUsbCDC::mWakeUpPin = -1;               ///< Пин для пробуждения от сна
 CUsbCDC *CUsbCDC::theSingleInstance = nullptr; ///< Единственный экземпляр класса
@@ -76,8 +76,7 @@ void CUsbCDC::rx(tinyusb_cdcacm_itf_t itf)
 void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 {
 #if CONFIG_PM_ENABLE
-    // Фиксируем максимальную частоту CPU для стабильной работы USB
-    esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "usb", &mPMLock);
+    esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "usb", &mPMLock);
     ESP_ERROR_CHECK(esp_pm_lock_acquire(mPMLock));
 #endif
 
@@ -93,12 +92,11 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 
     // Конфигурация ACM (Abstract Control Model) интерфейса
     tinyusb_config_cdcacm_t acm_cfg = {
-        .cdc_port = TINYUSB_CDC_ACM_0, // Первый CDC порт
-        .callback_rx = &cdc_rx_callback,                                // Callback на прием данных
+        .cdc_port = TINYUSB_CDC_ACM_0,   // Первый CDC порт
+        .callback_rx = &cdc_rx_callback, // Callback на прием данных
         .callback_rx_wanted_char = nullptr,
         .callback_line_state_changed = &cdc_line_state_changed_callback, // Callback на изменение DTR
-        .callback_line_coding_changed = nullptr
-    };
+        .callback_line_coding_changed = nullptr};
 
     // Инициализация ACM интерфейсов
     ESP_ERROR_CHECK(tusb_cdc_acm_init(&acm_cfg));
