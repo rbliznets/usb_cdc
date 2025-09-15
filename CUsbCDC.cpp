@@ -22,6 +22,8 @@
 
 // Статические члены класса
 int8_t CUsbCDC::mWakeUpPin = -1;               ///< Пин для пробуждения от сна
+uint8_t CUsbCDC::mPriority = 5;                ///< USB Device Task priority.
+int CUsbCDC::mCoreID = 1;                      ///<  USB Device Task core affinity.
 CUsbCDC *CUsbCDC::theSingleInstance = nullptr; ///< Единственный экземпляр класса
 
 // Обработчик приема данных через CDC
@@ -87,6 +89,8 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
         tusb_cfg.phy.self_powered = true;
         tusb_cfg.phy.vbus_monitor_io = mWakeUpPin;
     }
+    tusb_cfg.task.priority = mPriority;
+    tusb_cfg.task.xCoreID = mCoreID;
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
@@ -99,7 +103,7 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
         .callback_line_coding_changed = nullptr};
 
     // Инициализация ACM интерфейсов
-    ESP_ERROR_CHECK(tusb_cdc_acm_init(&acm_cfg));
+    ESP_ERROR_CHECK(tinyusb_cdcacm_init(&acm_cfg));
 
 #if (CONFIG_TINYUSB_CDC_COUNT > 1)
     // Инициализация второго интерфейса при необходимости
@@ -119,7 +123,7 @@ void CUsbCDC::stop()
 #if (CONFIG_TINYUSB_CDC_COUNT > 1)
     ESP_ERROR_CHECK(tusb_cdc_acm_deinit(TINYUSB_CDC_ACM_1));
 #endif
-    ESP_ERROR_CHECK(tusb_cdc_acm_deinit(TINYUSB_CDC_ACM_0));
+    ESP_ERROR_CHECK(tinyusb_cdcacm_deinit(TINYUSB_CDC_ACM_0));
     ESP_ERROR_CHECK(tinyusb_driver_uninstall());
 
 #if CONFIG_PM_ENABLE

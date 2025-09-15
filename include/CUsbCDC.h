@@ -15,8 +15,8 @@
 
 #include "esp_pm.h"
 #include "tinyusb.h"
-#include "tusb_console.h"
-#include "tusb_cdc_acm.h"
+#include "tinyusb_console.h"
+#include "tinyusb_cdc_acm.h"
 
 #define USB_MAX_DATA (128) // Максимальный размер данных для приема
 
@@ -74,7 +74,9 @@ protected:
 	~CUsbCDC() { stop(); };
 
 public:
-	static int8_t mWakeUpPin; ///< Wakeup пин для управления唤醒 состоянием.
+	static int8_t mWakeUpPin; ///< Wakeup пин для управления состоянием.
+	static uint8_t mPriority; ///< USB Device Task priority.
+	static int mCoreID; ///<  USB Device Task core affinity.
 
 	/// Единственный экземпляр класса.
 	/*!
