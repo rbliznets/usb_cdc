@@ -15,7 +15,6 @@
 
 #include "esp_pm.h"
 #include "tinyusb.h"
-#include "tinyusb_console.h"
 #include "tinyusb_cdc_acm.h"
 
 #define USB_MAX_DATA (128) // Максимальный размер данных для приема
