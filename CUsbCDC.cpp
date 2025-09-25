@@ -149,13 +149,13 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
             sz += s;
         else
         {
-            tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 10);
+            tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 0);
             return false;
         }
     }
 
     // Синхронная отправка данных с таймаутом 10 мс
-    if (tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 10) != ESP_OK)
+    if (tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 0) != ESP_OK)
         return false;
 
     return true;
