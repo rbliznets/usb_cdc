@@ -33,13 +33,28 @@ void CUsbCDC::cdc_rx_callback(int itf, cdcacm_event_t *event)
     CUsbCDC::Instance()->rx((tinyusb_cdcacm_itf_t)itf);
 }
 
-// Обработчик изменения состояния линии связи (DTR сигнал)
+void CUsbCDC::device_event_handler(tinyusb_event_t *event, void *arg)
+{
+    TDEC("event",event->id);
+    switch (event->id)
+    {
+    case TINYUSB_EVENT_ATTACHED:
+        if (CUsbCDC::Instance()->onConnect != nullptr)
+            CUsbCDC::Instance()->onConnect(0, true);
+        break;
+    case TINYUSB_EVENT_DETACHED:
+        if (CUsbCDC::Instance()->onConnect != nullptr)
+            CUsbCDC::Instance()->onConnect(0, false);
+        break;
+    }
+}
+
 void CUsbCDC::cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 {
-    int dtr = event->line_state_changed_data.dtr;
+    int rts = event->line_state_changed_data.rts;
     // Уведомляем о подключении/отключении
-    if (CUsbCDC::Instance()->onConnect != nullptr)
-        CUsbCDC::Instance()->onConnect(itf, (dtr == 1));
+    // if (CUsbCDC::Instance()->onConnect != nullptr)
+    //     CUsbCDC::Instance()->onConnect(itf, (dtr == 1));
 }
 
 // Обработка полученных данных

@@ -58,7 +58,9 @@ protected:
 	  \param[in] event параметры callback функции.
 	*/
 	static void cdc_line_state_changed_callback(int itf, cdcacm_event_t *event);
-
+	
+	static void device_event_handler(tinyusb_event_t *event, void *arg);
+	
 	/// Функция обработки данных из CDC.
 	/*!
 	  \param[in] itf номер CDC интерфейса.
