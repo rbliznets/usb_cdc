@@ -15,7 +15,6 @@
 
 #include "CUsbCDC.h"
 #include "esp_log.h"
-#include "CTrace.h"
 #include <cstring>
 #include "esp_sleep.h"
 #include "tinyusb_default_config.h"
@@ -30,6 +29,10 @@ int CUsbCDC::mCoreID = 1;
 // Singleton instance pointer - points to the single instance of this class
 CUsbCDC *CUsbCDC::theSingleInstance = nullptr; 
 
+#if CONFIG_LOG_DEFAULT_LEVEL > 0
+static const char* TAG = "CUsbCDC";
+#endif
+
 // Static callback function for receiving data through CDC
 // This function is called by the tinyUSB library when data is received
 // It delegates the processing to the instance method rx()
@@ -43,7 +46,7 @@ void CUsbCDC::cdc_rx_callback(int itf, cdcacm_event_t *event)
 // Handles TINYUSB_EVENT_ATTACHED and TINYUSB_EVENT_DETACHED events
 void CUsbCDC::device_event_handler(tinyusb_event_t *event, void *arg)
 {
-    // TDEC("event", event->id); // Debug logging macro (commented out)
+    // ESP_LOGI(TAG, "event %d", event->id); // Debug logging macro (commented out)
     switch (event->id)
     {
     case TINYUSB_EVENT_ATTACHED:
@@ -63,8 +66,8 @@ void CUsbCDC::device_event_handler(tinyusb_event_t *event, void *arg)
 // Handles changes in DTR (Data Terminal Ready) and RTS (Request To Send) signals
 void CUsbCDC::cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 {
-    // TDEC("rts", event->line_state_changed_data.rts); // Debug logging (commented out)
-    // TDEC("dtr", event->line_state_changed_data.dtr); // Debug logging (commented out)
+    // ESP_LOGI(TAG, "rts %d", event->line_state_changed_data.rts); // Debug logging (commented out)
+    // ESP_LOGI(TAG, "dtr %d", event->line_state_changed_data.dtr); // Debug logging (commented out)
     
     if (CUsbCDC::Instance()->onConnect != nullptr)
     {
@@ -82,10 +85,10 @@ void CUsbCDC::cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 // Currently commented out - not in use
 // void CUsbCDC::cdc_line_coding_changed_callback(int itf, cdcacm_event_t *event)
 // {
-//     TDEC("bit_rate",event->line_coding_changed_data.p_line_coding->bit_rate);
-//     TDEC("data_bits",event->line_coding_changed_data.p_line_coding->data_bits);
-//     TDEC("stop_bits",event->line_coding_changed_data.p_line_coding->stop_bits);
-//     TDEC("parity",event->line_coding_changed_data.p_line_coding->parity);
+//     ESP_LOGI(TAG, "bit_rate %d",event->line_coding_changed_data.p_line_coding->bit_rate);
+//     ESP_LOGI(TAG, "data_bits %d",event->line_coding_changed_data.p_line_coding->data_bits);
+//     ESP_LOGI(TAG, "stop_bits %d",event->line_coding_changed_data.p_line_coding->stop_bits);
+//     ESP_LOGI(TAG, "parity %d",event->line_coding_changed_data.p_line_coding->parity);
 // }
 
 // Process received data from USB CDC interface
@@ -103,7 +106,7 @@ void CUsbCDC::rx(tinyusb_cdcacm_itf_t itf)
         if (ret != ESP_OK)
         {
             // Log error if read operation fails
-            TRACE_E("CUsbCDC tinyusb_cdcacm_read failed", ret, false);
+            ESP_LOGE(TAG,"CUsbCDC tinyusb_cdcacm_read failed %d", ret);
             return;
         }
 
@@ -115,7 +118,7 @@ void CUsbCDC::rx(tinyusb_cdcacm_itf_t itf)
                 onCmd(itf, mRxBuf0, rx_size); 
             else
                 // Default logging if no callback is defined
-                TRACEDATA("cdc rx", mRxBuf0, rx_size); 
+                ESP_LOG_BUFFER_HEX(TAG, mRxBuf0, rx_size); 
         }
 
         // Exit when buffer is not full (no more data available)

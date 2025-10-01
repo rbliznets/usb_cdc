@@ -3,9 +3,6 @@ description: the command console and tracing to spiffs
 url: https://github.com/rbliznets/esp32-utils
 dependencies:
   espressif/esp_tinyusb: ">=2.0"
-  task:
-    version: "*"
-    git: https://github.com/rbliznets/esp32-task.git
   idf: ">=5.5"
 targets:
   - esp32
