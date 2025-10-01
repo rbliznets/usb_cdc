@@ -1,13 +1,13 @@
 /*!
     \file
-    \brief Класс-обертка для tinyUSB CDC (Communication Device Class)
-    \authors Близнец Р.А. (r.bliznets@gmail.com)
-    \version 0.1.0.0
+    \brief Wrapper class for tinyUSB CDC (Communication Device Class)
+    \authors Bliznets R.A. (r.bliznets@gmail.com)
+    \version 1.0.0.0
     \date 16.04.2024
 
-    Реализует Singleton-паттерн. Позволяет работать с USB CDC интерфейсом
-    как с последовательным портом. Обрабатывает события подключения и приема данных.
-    Один объект на приложение.
+    Implements Singleton pattern. Allows working with USB CDC interface
+    as with a serial port. Handles connection and data reception events.
+    One object per application.
 */
 
 #include "sdkconfig.h"
@@ -20,160 +20,207 @@
 #include "esp_sleep.h"
 #include "tinyusb_default_config.h"
 
-// Статические члены класса
-int8_t CUsbCDC::mWakeUpPin = -1;               ///< Пин для пробуждения от сна
-uint8_t CUsbCDC::mPriority = 5;                ///< USB Device Task priority.
-int CUsbCDC::mCoreID = 1;                      ///<  USB Device Task core affinity.
-CUsbCDC *CUsbCDC::theSingleInstance = nullptr; ///< Единственный экземпляр класса
+// Static class members initialization
+// Initialize pin for wake-up from sleep (default: -1 = disabled)
+int8_t CUsbCDC::mWakeUpPin = -1;               
+// USB Device Task priority (default: 5 - medium priority)
+uint8_t CUsbCDC::mPriority = 5;                
+// USB Device Task core affinity (default: core 1)
+int CUsbCDC::mCoreID = 1;                      
+// Singleton instance pointer - points to the single instance of this class
+CUsbCDC *CUsbCDC::theSingleInstance = nullptr; 
 
-// Обработчик приема данных через CDC
+// Static callback function for receiving data through CDC
+// This function is called by the tinyUSB library when data is received
+// It delegates the processing to the instance method rx()
 void CUsbCDC::cdc_rx_callback(int itf, cdcacm_event_t *event)
 {
-    // Делегируем обработку в метод экземпляра класса
+    // Delegate processing to instance method
     CUsbCDC::Instance()->rx((tinyusb_cdcacm_itf_t)itf);
 }
 
+// Static device event handler for USB attachment/detachment events
+// Handles TINYUSB_EVENT_ATTACHED and TINYUSB_EVENT_DETACHED events
 void CUsbCDC::device_event_handler(tinyusb_event_t *event, void *arg)
 {
-    TDEC("event",event->id);
+    // TDEC("event", event->id); // Debug logging macro (commented out)
     switch (event->id)
     {
     case TINYUSB_EVENT_ATTACHED:
+        // Call user-defined connection callback if available
         if (CUsbCDC::Instance()->onConnect != nullptr)
-            CUsbCDC::Instance()->onConnect(0, true);
+            CUsbCDC::Instance()->onConnect(-1, TINYUSB_ATTACHED);
         break;
     case TINYUSB_EVENT_DETACHED:
+        // Call user-defined disconnection callback if available
         if (CUsbCDC::Instance()->onConnect != nullptr)
-            CUsbCDC::Instance()->onConnect(0, false);
+            CUsbCDC::Instance()->onConnect(-1, TINYUSB_DETACHED);
         break;
     }
 }
 
+// Static callback for line state changes (DTR/RTS signals)
+// Handles changes in DTR (Data Terminal Ready) and RTS (Request To Send) signals
 void CUsbCDC::cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 {
-    int rts = event->line_state_changed_data.rts;
-    // Уведомляем о подключении/отключении
-    // if (CUsbCDC::Instance()->onConnect != nullptr)
-    //     CUsbCDC::Instance()->onConnect(itf, (dtr == 1));
+    // TDEC("rts", event->line_state_changed_data.rts); // Debug logging (commented out)
+    // TDEC("dtr", event->line_state_changed_data.dtr); // Debug logging (commented out)
+    
+    if (CUsbCDC::Instance()->onConnect != nullptr)
+    {
+        uint32_t x = 0;
+        // Set bit flags based on line state
+        if (event->line_state_changed_data.rts)
+            x |= TINYUSB_CDC_RTS;  // Set RTS flag if RTS is active
+        if (event->line_state_changed_data.dtr)
+            x |= TINYUSB_CDC_DTR;  // Set DTR flag if DTR is active
+        CUsbCDC::Instance()->onConnect(itf, x);
+    }
 }
 
-// Обработка полученных данных
+// Optional callback for line coding changes (baud rate, data bits, etc.)
+// Currently commented out - not in use
+// void CUsbCDC::cdc_line_coding_changed_callback(int itf, cdcacm_event_t *event)
+// {
+//     TDEC("bit_rate",event->line_coding_changed_data.p_line_coding->bit_rate);
+//     TDEC("data_bits",event->line_coding_changed_data.p_line_coding->data_bits);
+//     TDEC("stop_bits",event->line_coding_changed_data.p_line_coding->stop_bits);
+//     TDEC("parity",event->line_coding_changed_data.p_line_coding->parity);
+// }
+
+// Process received data from USB CDC interface
+// Reads data in chunks until the buffer is empty
 void CUsbCDC::rx(tinyusb_cdcacm_itf_t itf)
 {
     size_t rx_size = 0;
     esp_err_t ret;
 
-    // Читаем данные порциями до полного опустошения буфера
+    // Read data in chunks until buffer is completely empty
     for (;;)
     {
-        // Чтение данных в промежуточный буфер
+        // Read data into temporary buffer
         ret = tinyusb_cdcacm_read(itf, mRxBuf0, USB_MAX_DATA, &rx_size);
         if (ret != ESP_OK)
         {
+            // Log error if read operation fails
             TRACE_E("CUsbCDC tinyusb_cdcacm_read failed", ret, false);
             return;
         }
 
-        // Если данные получены - передаем их обработчику
+        // Process received data if available
         if (rx_size != 0)
         {
             if (onCmd != nullptr)
-                onCmd(itf, mRxBuf0, rx_size); // Пользовательский callback
+                // Call user-defined callback function with received data
+                onCmd(itf, mRxBuf0, rx_size); 
             else
-                TRACEDATA("cdc rx", mRxBuf0, rx_size); // Логирование по умолчанию
+                // Default logging if no callback is defined
+                TRACEDATA("cdc rx", mRxBuf0, rx_size); 
         }
 
-        // Выход при неполном буфере (больше данных нет)
+        // Exit when buffer is not full (no more data available)
         if (rx_size < USB_MAX_DATA)
             return;
     }
 }
 
-// Инициализация CDC интерфейса
+// Initialize CDC interface with callback functions
+// Sets up USB device, ACM interface, and power management
 void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 {
+    // Create power management lock to prevent light sleep when USB is active
 #if CONFIG_PM_ENABLE
     esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "usb", &mPMLock);
     ESP_ERROR_CHECK(esp_pm_lock_acquire(mPMLock));
 #endif
 
-    // Базовая конфигурация USB-устройства
-    tinyusb_config_t tusb_cfg = TINYUSB_DEFAULT_CONFIG();
-    if (mWakeUpPin > 0)
+    // Basic USB device configuration with device event handler
+    tinyusb_config_t tusb_cfg = TINYUSB_DEFAULT_CONFIG(device_event_handler);
+    
+    // Configure wake-up pin if specified
+    if (mWakeUpPin >= 0)
     {
-        tusb_cfg.phy.self_powered = true;
-        tusb_cfg.phy.vbus_monitor_io = mWakeUpPin;
+        tusb_cfg.phy.self_powered = true;      // Device is self-powered
+        tusb_cfg.phy.vbus_monitor_io = mWakeUpPin; // Monitor VBUS on specified pin
     }
+    
+    // Set task priority and core affinity
     tusb_cfg.task.priority = mPriority;
     tusb_cfg.task.xCoreID = mCoreID;
 
+    // Install tinyUSB driver with configured parameters
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
-    // Конфигурация ACM (Abstract Control Model) интерфейса
+    // Configure ACM (Abstract Control Model) interface
     tinyusb_config_cdcacm_t acm_cfg = {
-        .cdc_port = TINYUSB_CDC_ACM_0,   // Первый CDC порт
-        .callback_rx = &cdc_rx_callback, // Callback на прием данных
-        .callback_rx_wanted_char = nullptr,
-        .callback_line_state_changed = &cdc_line_state_changed_callback, // Callback на изменение DTR
-        .callback_line_coding_changed = nullptr};
+        .cdc_port = TINYUSB_CDC_ACM_0,   // First CDC port
+        .callback_rx = &cdc_rx_callback, // Callback for data reception
+        .callback_rx_wanted_char = nullptr, // No character matching callback
+        .callback_line_state_changed = &cdc_line_state_changed_callback, // DTR change callback
+        .callback_line_coding_changed = nullptr}; // No line coding change callback
 
-    // Инициализация ACM интерфейсов
+    // Initialize first ACM interface
     ESP_ERROR_CHECK(tinyusb_cdcacm_init(&acm_cfg));
 
 #if (CONFIG_TINYUSB_CDC_COUNT > 1)
-    // Инициализация второго интерфейса при необходимости
+    // Initialize second interface if configured
     acm_cfg.cdc_port = TINYUSB_CDC_ACM_1;
     ESP_ERROR_CHECK(tusb_cdc_acm_init(&acm_cfg));
 #endif
 
-    // Сохранение пользовательских обработчиков
-    onCmd = func;
-    onConnect = connect;
+    // Store user-defined callback functions
+    onCmd = func;      // Data reception callback
+    onConnect = connect; // Connection state callback
 }
 
-// Деинициализация CDC интерфейса
+// Deinitialize CDC interface and clean up resources
+// Uninitializes ACM interfaces and USB driver, releases power management lock
 void CUsbCDC::stop()
 {
-    TRACE_W("CUsbCDC off until reboot", -100, false);
 #if (CONFIG_TINYUSB_CDC_COUNT > 1)
+    // Uninitialize second interface if it was configured
     ESP_ERROR_CHECK(tusb_cdc_acm_deinit(TINYUSB_CDC_ACM_1));
 #endif
+    // Uninitialize first interface and USB driver
     ESP_ERROR_CHECK(tinyusb_cdcacm_deinit(TINYUSB_CDC_ACM_0));
     ESP_ERROR_CHECK(tinyusb_driver_uninstall());
 
+    // Release power management restrictions
 #if CONFIG_PM_ENABLE
-    // Снятие ограничений по частоте CPU
-    esp_pm_lock_release(mPMLock);
-    esp_pm_lock_delete(mPMLock);
+    esp_pm_lock_release(mPMLock);      // Release power management lock
+    esp_pm_lock_delete(mPMLock);       // Delete the lock
 #endif
 }
 
-// Отправка данных через CDC интерфейс
+// Send data through CDC interface
+// Queues data for transmission and performs synchronous flush with timeout
 bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
 {
-    // Постановка данных в очередь отправки
+    // Queue data for transmission
     size_t sz = tinyusb_cdcacm_write_queue((tinyusb_cdcacm_itf_t)itf, data, size);
     if (sz == 0)
-        return false; // Ошибка постановки в очередь
+        return false; // Error queuing data
 
-    // Дозапись оставшихся данных (если буфер заполнялся частями)
+    // Write remaining data if buffer was filled in parts
     while (sz != size)
     {
+        // Queue remaining data
         size_t s = tinyusb_cdcacm_write_queue((tinyusb_cdcacm_itf_t)itf, &data[sz], size - sz);
         if (s != 0)
-            sz += s;
+            sz += s;  // Increment total sent size
         else
         {
+            // Flush buffer and return false on failure
             tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 0);
             return false;
         }
     }
 
-    // Синхронная отправка данных с таймаутом 10 мс
+    // Synchronously flush data with 0ms timeout (blocks until sent)
     if (tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 0) != ESP_OK)
         return false;
 
-    return true;
+    return true; // Success
 }
 
 #endif // CONFIG_TINYUSB_CDC_ENABLED
