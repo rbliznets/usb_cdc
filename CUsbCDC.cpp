@@ -29,7 +29,7 @@ int CUsbCDC::mCoreID = 1;
 // Singleton instance pointer - points to the single instance of this class
 CUsbCDC *CUsbCDC::theSingleInstance = nullptr; 
 
-#if CONFIG_LOG_DEFAULT_LEVEL > 0
+#if CONFIG_LOG_DEFAULT_LEVEL >= 0
 static const char* TAG = "CUsbCDC";
 #endif
 
