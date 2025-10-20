@@ -28,12 +28,19 @@
  */
 typedef void onCDCDataRx(int itf, uint8_t *data, size_t size);
 
+
+// Bit flags for connection state notifications
+#define TINYUSB_CDC_DTR 0x01  ///< Data Terminal Ready signal flag
+#define TINYUSB_CDC_RTS 0x02  ///< Request To Send signal flag
+#define TINYUSB_ATTACHED 0x04 ///< USB device attached flag
+#define TINYUSB_DETACHED 0x08 ///< USB device detached flag
+
 /// Функция события на установку соединения.
 /*!
 	\param[in] itf номер CDC интерфейса.
 	\param[in] con true - подключение, false - отключение.
 */
-typedef void onCDCConect(int itf, bool con);
+typedef void onCDCConect(int itf, uint32_t con);
 
 /// Класс обертка для tinyUSB СDС.
 class CUsbCDC

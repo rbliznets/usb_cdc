@@ -33,10 +33,16 @@ void CUsbCDC::cdc_rx_callback(int itf, cdcacm_event_t *event)
 // Обработчик изменения состояния линии связи (DTR сигнал)
 void CUsbCDC::cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 {
-    int dtr = event->line_state_changed_data.dtr;
-    // Уведомляем о подключении/отключении
     if (CUsbCDC::Instance()->onConnect != nullptr)
-        CUsbCDC::Instance()->onConnect(itf, (dtr == 1));
+    {
+        uint32_t x = 0;
+        // Set bit flags based on line state
+        if (event->line_state_changed_data.rts)
+            x |= TINYUSB_CDC_RTS; // Set RTS flag if RTS is active
+        if (event->line_state_changed_data.dtr)
+            x |= TINYUSB_CDC_DTR; // Set DTR flag if DTR is active
+        CUsbCDC::Instance()->onConnect(itf, x);
+    }
 }
 
 // Обработка полученных данных
@@ -86,7 +92,7 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
         .string_descriptor = nullptr, // Без строковых дескрипторов
         .external_phy = false,        // Внутренний PHY
         .configuration_descriptor = nullptr,
-        .self_powered = true,         // Питание от самодостаточного источника
+        .self_powered = (mWakeUpPin >= 0),         // Питание от самодостаточного источника
         .vbus_monitor_io = mWakeUpPin // Пин для мониторинга питания
     };
 
@@ -94,8 +100,8 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 
     // Конфигурация ACM (Abstract Control Model) интерфейса
     tinyusb_config_cdcacm_t acm_cfg = {
-        .usb_dev = TINYUSB_USBDEV_0,                                    // Использовать первый USB-контроллер
-        .cdc_port = TINYUSB_CDC_ACM_0,                                  // Первый CDC порт
+        .usb_dev = TINYUSB_USBDEV_0,   // Использовать первый USB-контроллер
+        .cdc_port = TINYUSB_CDC_ACM_0, // Первый CDC порт
         // .rx_unread_buf_sz = USB_MAX_DATA,                               // Размер буфера приема
         .callback_rx = &cdc_rx_callback,                                // Callback на прием данных
         .callback_line_state_changed = &cdc_line_state_changed_callback // Callback на изменение DTR
