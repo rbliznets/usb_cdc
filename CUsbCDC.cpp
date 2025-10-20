@@ -150,6 +150,7 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
     // Set task priority and core affinity
     tusb_cfg.task.priority = mPriority;
     tusb_cfg.task.xCoreID = mCoreID;
+    tusb_cfg.task.size = 4096;
 
     // Install tinyUSB driver with configured parameters
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
