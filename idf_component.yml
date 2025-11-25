@@ -1,6 +1,6 @@
 version: "1.1.0"
-description: the command console and tracing to spiffs 
-url: https://github.com/rbliznets/esp32-utils
+description: usb cdc device 
+url: https://github.com/rbliznets/usb_cdc
 dependencies:
   espressif/esp_tinyusb: "==1.7.6~2"
   task:
