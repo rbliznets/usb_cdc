@@ -1,6 +1,6 @@
 version: "1.0.0"
-description: the command console and tracing to spiffs 
-url: https://github.com/rbliznets/esp32-utils
+description: esp32 usb cdc device 
+url: https://github.com/rbliznets/usb_cdc
 dependencies:
   espressif/esp_tinyusb: ">=2.0"
   idf: ">=5.5"
