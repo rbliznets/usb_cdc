@@ -2,7 +2,7 @@ version: "1.0.0"
 description: esp32 usb cdc device 
 url: https://github.com/rbliznets/usb_cdc
 dependencies:
-  espressif/esp_tinyusb: "^2.0"
+  espressif/esp_tinyusb: ">=2.2"
   idf: ">=5.5"
 targets:
   - esp32
