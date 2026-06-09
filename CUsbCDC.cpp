@@ -19,6 +19,7 @@
 #include "esp_sleep.h"
 #include "tinyusb_default_config.h"
 
+
 // Static class members initialization
 // Initialize pin for wake-up from sleep (default: -1 = disabled)
 int8_t CUsbCDC::mWakeUpPin = -1;               
@@ -133,7 +134,7 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 {
     // Create power management lock to prevent light sleep when USB is active
 #if CONFIG_PM_ENABLE
-    esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "usb", &mPMLock);
+    esp_pm_lock_create(ESP_PM_APB_FREQ_MAX, 0, "usb", &mPMLock);
     ESP_ERROR_CHECK(esp_pm_lock_acquire(mPMLock));
 #endif
 
@@ -196,35 +197,63 @@ void CUsbCDC::stop()
 #endif
 }
 
-// Send data through CDC interface
-// Queues data for transmission and performs synchronous flush with timeout
 bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
 {
-    // Queue data for transmission
-    size_t sz = tinyusb_cdcacm_write_queue((tinyusb_cdcacm_itf_t)itf, data, size);
-    if (sz == 0)
-        return false; // Error queuing data
+    tinyusb_cdcacm_itf_t usb_itf = (tinyusb_cdcacm_itf_t)itf;
 
-    // Write remaining data if buffer was filled in parts
-    while (sz != size)
+    // 1. Проверяем, подключен ли кабель и открыт ли COM-порт на ПК.
+    // Если хоста нет, сразу выходим, чтобы не тратить время и не забивать буфер.
+    if (!tud_cdc_n_connected(itf)) {
+        return false; 
+    }
+
+    size_t sz = tinyusb_cdcacm_write_queue(usb_itf, data, size);
+    
+    // Если не удалось положить в очередь вообще ничего
+    if (sz == 0 && size > 0) {
+        // Пробуем протолкнуть то, что зависло с прошлых разов, с таймаутом 10 мс
+        tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(10));
+        return false; 
+    }
+
+    // 2. Дозапись оставшихся данных, если пакет не поместился целиком
+    uint32_t attempts = 0;
+    while (sz < size)
     {
-        // Queue remaining data
-        size_t s = tinyusb_cdcacm_write_queue((tinyusb_cdcacm_itf_t)itf, &data[sz], size - sz);
-        if (s != 0)
-            sz += s;  // Increment total sent size
-        else
-        {
-            // Flush buffer and return false on failure
-            tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 0);
-            return false;
+        size_t s = tinyusb_cdcacm_write_queue(usb_itf, &data[sz], size - sz);
+        if (s != 0) {
+            sz += s;
+            attempts = 0; // Сбрасываем счетчик неудачных попыток
+        } else {
+            // Буфер полон. Пытаемся принудительно протолкнуть данные хосту
+            // Задаем реальный таймаут (например, 5-10 мс) вместо 0
+            esp_err_t flush_err = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(10));
+            
+            // Обязательно даем планировщику FreeRTOS передать контекст таске TinyUSB!
+            vTaskDelay(pdMS_TO_TICKS(1)); 
+
+            attempts++;
+            // Если после нескольких попыток и flush буфер не освободился — хост «умер»
+            if (flush_err != ESP_OK || attempts > 5) {
+                // ВАЖНО: сбрасываем застрявшие данные из TX FIFO TinyUSB,
+                // иначе порт заблокируется навсегда для всех следующих отправк.
+                tud_cdc_n_write_clear(itf); 
+                return false;
+            }
         }
     }
 
-    // Synchronously flush data with 0ms timeout (blocks until sent)
-    if (tinyusb_cdcacm_write_flush((tinyusb_cdcacm_itf_t)itf, 0) != ESP_OK)
+    // 3. Финальный синхронный flush с безопасным таймаутом (например, 50 мс)
+    // Этого времени более чем достаточно для передачи даже большого пакета по Full-Speed USB.
+    esp_err_t res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50));
+    if (res != ESP_OK) {
+        // Если таймаут сработал — чистим буфер
+        tud_cdc_n_write_clear(itf);
         return false;
+    }
 
-    return true; // Success
+    return true;
 }
+
 
 #endif // CONFIG_TINYUSB_CDC_ENABLED
