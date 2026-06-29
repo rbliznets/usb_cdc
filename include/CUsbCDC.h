@@ -20,7 +20,7 @@
 #include "tinyusb_cdc_acm.h"
 
 // Maximum data size for reception (128 bytes)
-#define USB_MAX_DATA (128)
+#define USB_MAX_DATA (1024)
 
 /// Function pointer type for data reception event callback.
 /*!

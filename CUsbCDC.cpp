@@ -19,19 +19,18 @@
 #include "esp_sleep.h"
 #include "tinyusb_default_config.h"
 
-
 // Static class members initialization
 // Initialize pin for wake-up from sleep (default: -1 = disabled)
-int8_t CUsbCDC::mWakeUpPin = -1;               
+int8_t CUsbCDC::mWakeUpPin = -1;
 // USB Device Task priority (default: 5 - medium priority)
-uint8_t CUsbCDC::mPriority = 5;                
+uint8_t CUsbCDC::mPriority = 5;
 // USB Device Task core affinity (default: core 1)
-int CUsbCDC::mCoreID = 1;                      
+int CUsbCDC::mCoreID = 1;
 // Singleton instance pointer - points to the single instance of this class
-CUsbCDC *CUsbCDC::theSingleInstance = nullptr; 
+CUsbCDC *CUsbCDC::theSingleInstance = nullptr;
 
 #if CONFIG_LOG_DEFAULT_LEVEL >= 0
-static const char* TAG = "CUsbCDC";
+static const char *TAG = "CUsbCDC";
 #endif
 
 // Static callback function for receiving data through CDC
@@ -69,15 +68,15 @@ void CUsbCDC::cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 {
     // ESP_LOGI(TAG, "rts %d", event->line_state_changed_data.rts); // Debug logging (commented out)
     // ESP_LOGI(TAG, "dtr %d", event->line_state_changed_data.dtr); // Debug logging (commented out)
-    
+
     if (CUsbCDC::Instance()->onConnect != nullptr)
     {
         uint32_t x = 0;
         // Set bit flags based on line state
         if (event->line_state_changed_data.rts)
-            x |= TINYUSB_CDC_RTS;  // Set RTS flag if RTS is active
+            x |= TINYUSB_CDC_RTS; // Set RTS flag if RTS is active
         if (event->line_state_changed_data.dtr)
-            x |= TINYUSB_CDC_DTR;  // Set DTR flag if DTR is active
+            x |= TINYUSB_CDC_DTR; // Set DTR flag if DTR is active
         CUsbCDC::Instance()->onConnect(itf, x);
     }
 }
@@ -107,7 +106,7 @@ void CUsbCDC::rx(tinyusb_cdcacm_itf_t itf)
         if (ret != ESP_OK)
         {
             // Log error if read operation fails
-            ESP_LOGE(TAG,"CUsbCDC tinyusb_cdcacm_read failed %d", ret);
+            ESP_LOGE(TAG, "CUsbCDC tinyusb_cdcacm_read failed %d", ret);
             return;
         }
 
@@ -116,10 +115,10 @@ void CUsbCDC::rx(tinyusb_cdcacm_itf_t itf)
         {
             if (onCmd != nullptr)
                 // Call user-defined callback function with received data
-                onCmd(itf, mRxBuf0, rx_size); 
+                onCmd(itf, mRxBuf0, rx_size);
             else
                 // Default logging if no callback is defined
-                ESP_LOG_BUFFER_HEX(TAG, mRxBuf0, rx_size); 
+                ESP_LOG_BUFFER_HEX(TAG, mRxBuf0, rx_size);
         }
 
         // Exit when buffer is not full (no more data available)
@@ -140,14 +139,14 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 
     // Basic USB device configuration with device event handler
     tinyusb_config_t tusb_cfg = TINYUSB_DEFAULT_CONFIG(device_event_handler);
-    
+
     // Configure wake-up pin if specified
     if (mWakeUpPin >= 0)
     {
-        tusb_cfg.phy.self_powered = true;      // Device is self-powered
+        tusb_cfg.phy.self_powered = true;          // Device is self-powered
         tusb_cfg.phy.vbus_monitor_io = mWakeUpPin; // Monitor VBUS on specified pin
     }
-    
+
     // Set task priority and core affinity
     tusb_cfg.task.priority = mPriority;
     tusb_cfg.task.xCoreID = mCoreID;
@@ -158,11 +157,11 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 
     // Configure ACM (Abstract Control Model) interface
     tinyusb_config_cdcacm_t acm_cfg = {
-        .cdc_port = TINYUSB_CDC_ACM_0,   // First CDC port
-        .callback_rx = &cdc_rx_callback, // Callback for data reception
-        .callback_rx_wanted_char = nullptr, // No character matching callback
+        .cdc_port = TINYUSB_CDC_ACM_0,                                   // First CDC port
+        .callback_rx = &cdc_rx_callback,                                 // Callback for data reception
+        .callback_rx_wanted_char = nullptr,                              // No character matching callback
         .callback_line_state_changed = &cdc_line_state_changed_callback, // DTR change callback
-        .callback_line_coding_changed = nullptr}; // No line coding change callback
+        .callback_line_coding_changed = nullptr};                        // No line coding change callback
 
     // Initialize first ACM interface
     ESP_ERROR_CHECK(tinyusb_cdcacm_init(&acm_cfg));
@@ -174,7 +173,7 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 #endif
 
     // Store user-defined callback functions
-    onCmd = func;      // Data reception callback
+    onCmd = func;        // Data reception callback
     onConnect = connect; // Connection state callback
 }
 
@@ -192,8 +191,8 @@ void CUsbCDC::stop()
 
     // Release power management restrictions
 #if CONFIG_PM_ENABLE
-    esp_pm_lock_release(mPMLock);      // Release power management lock
-    esp_pm_lock_delete(mPMLock);       // Delete the lock
+    esp_pm_lock_release(mPMLock); // Release power management lock
+    esp_pm_lock_delete(mPMLock);  // Delete the lock
 #endif
 }
 
@@ -203,17 +202,21 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
 
     // 1. Проверяем, подключен ли кабель и открыт ли COM-порт на ПК.
     // Если хоста нет, сразу выходим, чтобы не тратить время и не забивать буфер.
-    if (!tud_cdc_n_connected(itf)) {
-        return false; 
+    if (!tud_cdc_n_connected(itf))
+    {
+        // ESP_LOGE(TAG,"10");
+        return false;
     }
 
     size_t sz = tinyusb_cdcacm_write_queue(usb_itf, data, size);
-    
+
     // Если не удалось положить в очередь вообще ничего
-    if (sz == 0 && size > 0) {
+    if (sz == 0 && size > 0)
+    {
         // Пробуем протолкнуть то, что зависло с прошлых разов, с таймаутом 10 мс
-        tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(10));
-        return false; 
+        tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50));
+        // ESP_LOGE(TAG,"0");
+        return false;
     }
 
     // 2. Дозапись оставшихся данных, если пакет не поместился целиком
@@ -221,23 +224,29 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
     while (sz < size)
     {
         size_t s = tinyusb_cdcacm_write_queue(usb_itf, &data[sz], size - sz);
-        if (s != 0) {
+        if (s != 0)
+        {
             sz += s;
             attempts = 0; // Сбрасываем счетчик неудачных попыток
-        } else {
+        }
+        else
+        {
             // Буфер полон. Пытаемся принудительно протолкнуть данные хосту
             // Задаем реальный таймаут (например, 5-10 мс) вместо 0
             esp_err_t flush_err = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(10));
-            
+            // ESP_LOGE(TAG,"1");
+
             // Обязательно даем планировщику FreeRTOS передать контекст таске TinyUSB!
-            vTaskDelay(pdMS_TO_TICKS(1)); 
+            vTaskDelay(pdMS_TO_TICKS(2));
 
             attempts++;
             // Если после нескольких попыток и flush буфер не освободился — хост «умер»
-            if (flush_err != ESP_OK || attempts > 5) {
+            if (flush_err != ESP_OK || attempts > 5)
+            {
                 // ВАЖНО: сбрасываем застрявшие данные из TX FIFO TinyUSB,
                 // иначе порт заблокируется навсегда для всех следующих отправк.
-                tud_cdc_n_write_clear(itf); 
+                tud_cdc_n_write_clear(itf);
+
                 return false;
             }
         }
@@ -245,15 +254,16 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
 
     // 3. Финальный синхронный flush с безопасным таймаутом (например, 50 мс)
     // Этого времени более чем достаточно для передачи даже большого пакета по Full-Speed USB.
-    esp_err_t res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50));
-    if (res != ESP_OK) {
+    esp_err_t res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(10));
+    if (res != ESP_OK)
+    {
         // Если таймаут сработал — чистим буфер
         tud_cdc_n_write_clear(itf);
+        //    ESP_LOGE(TAG,"2");
         return false;
     }
 
     return true;
 }
-
 
 #endif // CONFIG_TINYUSB_CDC_ENABLED
