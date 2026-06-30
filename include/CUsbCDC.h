@@ -35,6 +35,7 @@ typedef void onCDCDataRx(int itf, uint8_t *data, size_t size);
 #define TINYUSB_CDC_RTS 0x02  ///< Request To Send signal flag
 #define TINYUSB_ATTACHED 0x04 ///< USB device attached flag
 #define TINYUSB_DETACHED 0x08 ///< USB device detached flag
+#define TINYUSB_CODING 0x10 
 
 /// Function pointer type for connection event callback.
 /*!
@@ -77,7 +78,7 @@ protected:
 	static void cdc_line_state_changed_callback(int itf, cdcacm_event_t *event);
 
 	// Optional callback for line coding changes (baud rate, parity, etc.) - currently unused
-	// static void cdc_line_coding_changed_callback(int itf, cdcacm_event_t *event);
+	static void cdc_line_coding_changed_callback(int itf, cdcacm_event_t *event);
 
 	/// Static callback function for handling USB device attachment/detachment events.
 	/// Called when USB device is connected or disconnected from host.

@@ -83,13 +83,15 @@ void CUsbCDC::cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 
 // Optional callback for line coding changes (baud rate, data bits, etc.)
 // Currently commented out - not in use
-// void CUsbCDC::cdc_line_coding_changed_callback(int itf, cdcacm_event_t *event)
-// {
-//     ESP_LOGI(TAG, "bit_rate %d",event->line_coding_changed_data.p_line_coding->bit_rate);
-//     ESP_LOGI(TAG, "data_bits %d",event->line_coding_changed_data.p_line_coding->data_bits);
-//     ESP_LOGI(TAG, "stop_bits %d",event->line_coding_changed_data.p_line_coding->stop_bits);
-//     ESP_LOGI(TAG, "parity %d",event->line_coding_changed_data.p_line_coding->parity);
-// }
+void CUsbCDC::cdc_line_coding_changed_callback(int itf, cdcacm_event_t *event)
+{
+    // ESP_LOGI(TAG, "bit_rate %d",event->line_coding_changed_data.p_line_coding->bit_rate);
+    // ESP_LOGI(TAG, "data_bits %d",event->line_coding_changed_data.p_line_coding->data_bits);
+    // ESP_LOGI(TAG, "stop_bits %d",event->line_coding_changed_data.p_line_coding->stop_bits);
+    // ESP_LOGI(TAG, "parity %d",event->line_coding_changed_data.p_line_coding->parity);
+    if (CUsbCDC::Instance()->onConnect != nullptr)
+        CUsbCDC::Instance()->onConnect(-1, TINYUSB_CODING);
+}
 
 // Process received data from USB CDC interface
 // Reads data in chunks until the buffer is empty
@@ -157,11 +159,11 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 
     // Configure ACM (Abstract Control Model) interface
     tinyusb_config_cdcacm_t acm_cfg = {
-        .cdc_port = TINYUSB_CDC_ACM_0,                                   // First CDC port
-        .callback_rx = &cdc_rx_callback,                                 // Callback for data reception
-        .callback_rx_wanted_char = nullptr,                              // No character matching callback
-        .callback_line_state_changed = &cdc_line_state_changed_callback, // DTR change callback
-        .callback_line_coding_changed = nullptr};                        // No line coding change callback
+        .cdc_port = TINYUSB_CDC_ACM_0,                                      // First CDC port
+        .callback_rx = &cdc_rx_callback,                                    // Callback for data reception
+        .callback_rx_wanted_char = nullptr,                                 // No character matching callback
+        .callback_line_state_changed = &cdc_line_state_changed_callback,    // DTR change callback
+        .callback_line_coding_changed = &cdc_line_coding_changed_callback}; // No line coding change callback
 
     // Initialize first ACM interface
     ESP_ERROR_CHECK(tinyusb_cdcacm_init(&acm_cfg));
