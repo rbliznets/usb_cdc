@@ -215,10 +215,14 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
     // Если не удалось положить в очередь вообще ничего
     if (sz == 0 && size > 0)
     {
-        // Пробуем протолкнуть то, что зависло с прошлых разов, с таймаутом 10 мс
-        tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50));
-        // ESP_LOGE(TAG,"0");
-        return false;
+        // Пробуем протолкнуть то, что зависло с прошлых разов, с таймаутом 50 мс
+        if (tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50)) != ESP_OK)
+        {
+            // ESP_LOGE(TAG,"0");
+            return false;
+        }
+        // Буфер освободился - пробуем поставить данные в очередь ещё раз
+        sz = tinyusb_cdcacm_write_queue(usb_itf, data, size);
     }
 
     // 2. Дозапись оставшихся данных, если пакет не поместился целиком
@@ -243,7 +247,7 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
 
             attempts++;
             // Если после нескольких попыток и flush буфер не освободился — хост «умер»
-            if (flush_err != ESP_OK || attempts > 5)
+            if (flush_err != ESP_OK && attempts > 5)
             {
                 // ВАЖНО: сбрасываем застрявшие данные из TX FIFO TinyUSB,
                 // иначе порт заблокируется навсегда для всех следующих отправк.
@@ -256,7 +260,7 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
 
     // 3. Финальный синхронный flush с безопасным таймаутом (например, 50 мс)
     // Этого времени более чем достаточно для передачи даже большого пакета по Full-Speed USB.
-    esp_err_t res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(10));
+    esp_err_t res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50));
     if (res != ESP_OK)
     {
         // Если таймаут сработал — чистим буфер
