@@ -167,6 +167,16 @@ public:
 	  \return true on successful transmission, false on error.
 	*/
 	bool send(int itf, uint8_t *data, size_t size);
+
+	/// Check whether the host is actually connected to the given interface (DTR asserted).
+	/*!
+	  \details A `false` return from send() can also mean a transient write/flush
+	           timeout rather than a real disconnect - use this to tell the two
+	           apart instead of assuming every failed send() means the host is gone.
+	  \param[in] itf CDC interface number (0 or 1).
+	  \return true if the host currently has the port open (DTR asserted).
+	*/
+	static inline bool isConnected(int itf) { return tud_cdc_n_connected(itf); };
 };
 
 #endif // CONFIG_TINYUSB_CDC_ENABLED

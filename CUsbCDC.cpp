@@ -246,8 +246,9 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
             vTaskDelay(pdMS_TO_TICKS(2));
 
             attempts++;
-            // Если после нескольких попыток и flush буфер не освободился — хост «умер»
-            if (flush_err != ESP_OK && attempts > 5)
+            // Если после нескольких попыток и flush буфер не освободился, и хост
+            // при этом действительно отключился — дальше ждать бессмысленно.
+            if (flush_err != ESP_OK && attempts > 5 && !tud_cdc_n_connected(itf))
             {
                 // ВАЖНО: сбрасываем застрявшие данные из TX FIFO TinyUSB,
                 // иначе порт заблокируется навсегда для всех следующих отправк.
@@ -258,18 +259,30 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
         }
     }
 
-    // 3. Финальный синхронный flush с безопасным таймаутом (например, 50 мс)
-    // Этого времени более чем достаточно для передачи даже большого пакета по Full-Speed USB.
-    esp_err_t res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50));
-    if (res != ESP_OK)
+    // 3. Финальный flush. Одного таймаута в 50 мс не всегда достаточно для
+    // многопакетной передачи: flush() проталкивает данные из FIFO пакетами
+    // по CFG_TUD_CDC_EP_BUFSIZE (64 байта на Full-Speed), а хост может на
+    // короткое время задержаться с чтением (планировщик ОС, USB polling).
+    // Раньше единичный таймаут здесь трактовался как «хост умер» и вызывал
+    // tud_cdc_n_write_clear() - а это стирало ещё не отправленный хвост уже
+    // начатого сообщения, из-за чего на приёмнике сообщение обрывалось
+    // ровно на границе пакета. Теперь даём хосту несколько попыток и чистим
+    // буфер/сдаёмся только если соединение действительно пропало.
+    esp_err_t res;
+    uint32_t flush_attempts = 0;
+    do
     {
-        // Если таймаут сработал — чистим буфер
-        tud_cdc_n_write_clear(itf);
-        //    ESP_LOGE(TAG,"2");
-        return false;
-    }
+        res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50));
+        if (res == ESP_OK)
+            return true;
+        flush_attempts++;
+    } while ((flush_attempts < 5) && tud_cdc_n_connected(itf));
 
-    return true;
+    // Хост либо реально отключился, либо не смог дочитать данные за
+    // разумное суммарное время - только тогда чистим TX FIFO.
+    tud_cdc_n_write_clear(itf);
+    //    ESP_LOGE(TAG,"2");
+    return false;
 }
 
 #endif // CONFIG_TINYUSB_CDC_ENABLED
