@@ -227,6 +227,7 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
 
     // 2. Дозапись оставшихся данных, если пакет не поместился целиком
     uint32_t attempts = 0;
+    TickType_t progress = xTaskGetTickCount(); // Момент последней удачной постановки в очередь
     while (sz < size)
     {
         size_t s = tinyusb_cdcacm_write_queue(usb_itf, &data[sz], size - sz);
@@ -234,6 +235,7 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
         {
             sz += s;
             attempts = 0; // Сбрасываем счетчик неудачных попыток
+            progress = xTaskGetTickCount();
         }
         else
         {
@@ -248,7 +250,12 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
             attempts++;
             // Если после нескольких попыток и flush буфер не освободился, и хост
             // при этом действительно отключился — дальше ждать бессмысленно.
-            if (flush_err != ESP_OK && attempts > 5 && !tud_cdc_n_connected(itf))
+            // То же, если хост подключён, но не забирает данные дольше, чем его ждёт
+            // финальный flush: сюда попадает любое сообщение длиннее TX FIFO
+            // (CONFIG_TINYUSB_CDC_TX_BUFSIZE), и без этого предела задача ждала бы
+            // остановившегося хоста бесконечно.
+            if (flush_err != ESP_OK && attempts > 5 &&
+                (!tud_cdc_n_connected(itf) || (xTaskGetTickCount() - progress) > pdMS_TO_TICKS(USB_TX_STALL_MS)))
             {
                 // ВАЖНО: сбрасываем застрявшие данные из TX FIFO TinyUSB,
                 // иначе порт заблокируется навсегда для всех следующих отправк.
@@ -272,7 +279,7 @@ bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
     uint32_t flush_attempts = 0;
     do
     {
-        res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(50));
+        res = tinyusb_cdcacm_write_flush(usb_itf, pdMS_TO_TICKS(USB_TX_STALL_MS / 5));
         if (res == ESP_OK)
             return true;
         flush_attempts++;

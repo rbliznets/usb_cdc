@@ -21,6 +21,8 @@
 
 // Maximum data size for reception (128 bytes)
 #define USB_MAX_DATA (1024)
+// How long send() waits for a connected host that does not take the data (ms)
+#define USB_TX_STALL_MS (250)
 
 /// Function pointer type for data reception event callback.
 /*!
