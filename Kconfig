@@ -1,0 +1,13 @@
+menu "USB CDC"
+    depends on TINYUSB_CDC_ENABLED
+
+    config USB_CDC_SERIAL_STRING
+        string "Serial number string"
+        default "000001"
+        help
+            Fixed USB serial number string. The same serial number on all devices
+            makes Windows assign them the same COM port number.
+            Leave empty to use the esp_tinyusb default (since esp_tinyusb 3.0 it is
+            derived from the eFuse base MAC, so every device gets its own COM port).
+
+endmenu

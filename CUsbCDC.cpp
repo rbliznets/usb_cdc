@@ -29,6 +29,30 @@ int CUsbCDC::mCoreID = 1;
 // Singleton instance pointer - points to the single instance of this class
 CUsbCDC *CUsbCDC::theSingleInstance = nullptr;
 
+// String descriptors: same layout as esp_tinyusb default (descriptor_str_default),
+// but with the serial number from CONFIG_USB_CDC_SERIAL_STRING
+static const char sLangId[] = {0x09, 0x04};
+static const char *sStringDescriptors[] = {
+    sLangId,                                 // 0: Supported language is English (0x0409)
+    CONFIG_TINYUSB_DESC_MANUFACTURER_STRING, // 1: Manufacturer
+    CONFIG_TINYUSB_DESC_PRODUCT_STRING,      // 2: Product
+    CONFIG_USB_CDC_SERIAL_STRING,            // 3: Serial number
+    CONFIG_TINYUSB_DESC_CDC_STRING,          // CDC Interface
+#if CONFIG_TINYUSB_MSC_ENABLED
+    CONFIG_TINYUSB_DESC_MSC_STRING, // MSC Interface
+#endif
+#if CONFIG_TINYUSB_MTP_ENABLED
+    CONFIG_TINYUSB_DESC_MTP_STRING, // MTP Interface
+#endif
+#if CONFIG_TINYUSB_NET_MODE_ECM_RNDIS || CONFIG_TINYUSB_NET_MODE_NCM
+    "USB net", // NET Interface
+    "",        // MAC
+#endif
+#if CONFIG_TINYUSB_VENDOR_COUNT > 0
+    "Vendor specific", // Vendor specific
+#endif
+};
+
 #if CONFIG_LOG_DEFAULT_LEVEL >= 0
 static const char *TAG = "CUsbCDC";
 #endif
@@ -144,6 +168,13 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
 
     // Basic USB device configuration with device event handler
     tinyusb_config_t tusb_cfg = TINYUSB_DEFAULT_CONFIG(device_event_handler);
+
+    // Fixed serial number (esp_tinyusb 3.0 derives it from MAC by default)
+    if (CONFIG_USB_CDC_SERIAL_STRING[0] != '\0')
+    {
+        tusb_cfg.descriptor.string = sStringDescriptors;
+        tusb_cfg.descriptor.string_count = sizeof(sStringDescriptors) / sizeof(sStringDescriptors[0]);
+    }
 
     // Configure wake-up pin if specified
     if (mWakeUpPin >= 0)
