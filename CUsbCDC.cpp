@@ -59,6 +59,9 @@ void CUsbCDC::device_event_handler(tinyusb_event_t *event, void *arg)
         if (CUsbCDC::Instance()->onConnect != nullptr)
             CUsbCDC::Instance()->onConnect(-1, TINYUSB_DETACHED);
         break;
+    default:
+        // TINYUSB_EVENT_SUSPENDED/RESUMED (always delivered since esp_tinyusb 3.0) are ignored
+        break;
     }
 }
 
