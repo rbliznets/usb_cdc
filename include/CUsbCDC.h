@@ -100,6 +100,15 @@ protected:
 	// Temporary buffer for receiving data (size: USB_MAX_DATA bytes)
 	uint8_t mRxBuf0[USB_MAX_DATA];
 
+	// Attach state and event counters reported by tinyUSB - used by the {"get":["usb"]} diagnostics.
+	// Attached means the device has been seen by a host (D+ pull-up accepted), it does NOT mean
+	// that the host has the CDC port open - that is isConnected(itf) (DTR asserted).
+	volatile bool mAttached = false;
+	uint32_t mAttachCount = 0;
+	uint32_t mDetachCount = 0;
+	// tinyUSB driver installed and ACM interface initialized
+	bool mStarted = false;
+
 	// User-defined callback for handling received data (can be nullptr)
 	onCDCDataRx *onCmd = nullptr;
 
@@ -112,6 +121,13 @@ protected:
 public:
 	// Wakeup pin for managing sleep state (default: -1 = disabled)
 	static int8_t mWakeUpPin;
+
+	// VBUS monitoring on the wakeup pin (self-powered device, OTG BVALID input).
+	// The board is not powered from USB: VBUS is only used as "cable plugged" sign and,
+	// when monitoring is on, the device does not attach to the bus until the pin is high.
+	// Set it to false to attach regardless of the VBUS detector (diagnostics: isolates a
+	// wrong/absent VBUS divider from the USB data path).
+	static bool mVbusMonitor;
 
 	// USB Device Task priority (default: 5 - medium priority)
 	static uint8_t mPriority;
@@ -179,6 +195,25 @@ public:
 	  \return true if the host currently has the port open (DTR asserted).
 	*/
 	static inline bool isConnected(int itf) { return tud_cdc_n_connected(itf); };
+
+	/// Enable or disable VBUS monitoring on the wakeup pin (must be set before start()).
+	static inline void setVbusMonitor(bool on) { mVbusMonitor = on; };
+
+	/// Whether VBUS monitoring is requested (see setVbusMonitor()).
+	static inline bool vbusMonitor() { return mVbusMonitor; };
+
+	/// Device is attached to the bus (tinyUSB raised TINYUSB_EVENT_ATTACHED).
+	bool attached() const { return mAttached; };
+
+	/// Number of attach events since start() - a growing counter means the host keeps
+	/// re-enumerating the device (flapping cable/power, PHY problem).
+	uint32_t attachCount() const { return mAttachCount; };
+
+	/// Number of detach events since start().
+	uint32_t detachCount() const { return mDetachCount; };
+
+	/// tinyUSB driver installed and ACM interface initialized.
+	bool isStarted() const { return mStarted; };
 };
 
 #endif // CONFIG_TINYUSB_CDC_ENABLED

@@ -22,6 +22,8 @@
 // Static class members initialization
 // Initialize pin for wake-up from sleep (default: -1 = disabled)
 int8_t CUsbCDC::mWakeUpPin = -1;
+// VBUS monitoring for a self-powered device (enabled by default)
+bool CUsbCDC::mVbusMonitor = true;
 // USB Device Task priority (default: 5 - medium priority)
 uint8_t CUsbCDC::mPriority = 5;
 // USB Device Task core affinity (default: core 1)
@@ -74,11 +76,16 @@ void CUsbCDC::device_event_handler(tinyusb_event_t *event, void *arg)
     switch (event->id)
     {
     case TINYUSB_EVENT_ATTACHED:
+        // Device accepted by the host - remember it for the {"get":["usb"]} diagnostics
+        CUsbCDC::Instance()->mAttached = true;
+        CUsbCDC::Instance()->mAttachCount++;
         // Call user-defined connection callback if available
         if (CUsbCDC::Instance()->onConnect != nullptr)
             CUsbCDC::Instance()->onConnect(-1, TINYUSB_ATTACHED);
         break;
     case TINYUSB_EVENT_DETACHED:
+        CUsbCDC::Instance()->mAttached = false;
+        CUsbCDC::Instance()->mDetachCount++;
         // Call user-defined disconnection callback if available
         if (CUsbCDC::Instance()->onConnect != nullptr)
             CUsbCDC::Instance()->onConnect(-1, TINYUSB_DETACHED);
@@ -176,8 +183,10 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
         tusb_cfg.descriptor.string_count = sizeof(sStringDescriptors) / sizeof(sStringDescriptors[0]);
     }
 
-    // Configure wake-up pin if specified
-    if (mWakeUpPin >= 0)
+    // Configure wake-up pin if specified and VBUS monitoring is requested.
+    // With monitoring on, the OTG waits for the VBUS detector (GPIO -> BVALID) before
+    // pulling D+ up: a wrong/absent VBUS level means "device is never seen by the host".
+    if ((mWakeUpPin >= 0) && mVbusMonitor)
     {
         tusb_cfg.phy.self_powered = true;          // Device is self-powered
         tusb_cfg.phy.vbus_monitor_io = mWakeUpPin; // Monitor VBUS on specified pin
@@ -211,6 +220,9 @@ void CUsbCDC::start(onCDCDataRx *func, onCDCConect *connect)
     // Store user-defined callback functions
     onCmd = func;        // Data reception callback
     onConnect = connect; // Connection state callback
+
+    // Driver is up: {"get":["usb"]} can now report the attach state
+    mStarted = true;
 }
 
 // Deinitialize CDC interface and clean up resources
@@ -230,6 +242,10 @@ void CUsbCDC::stop()
     esp_pm_lock_release(mPMLock); // Release power management lock
     esp_pm_lock_delete(mPMLock);  // Delete the lock
 #endif
+
+    // Driver is down: reset the diagnostics state
+    mStarted = false;
+    mAttached = false;
 }
 
 bool CUsbCDC::send(int itf, uint8_t *data, size_t size)
